@@ -22,7 +22,6 @@
 
 // custom
 #include "../include/common.h"
-#include "../include/radar_alg_main.h"
 
 #include "../include/msg/ArbeRadarPoint.h"
 #include "../include/msg/ArbeRadarMsg.h"
@@ -38,8 +37,6 @@ ros::Publisher arbe_msg_pub;
 ros::Publisher arbe_pc_pub;
 
 image_transport::Publisher img_pub;
-
-RadarExp::radarAlg radarRuner;
 
 float arbe2lidar[4 * 3] = {0.9981128011677526, 0.05916115557244023, 0.016455814060541557,
                            0.07800451346438697, -0.059503891609836816, 0.9980033119043885,
@@ -320,21 +317,11 @@ void radarExpDemo(void)
     // 从点云文件读取雷达点云信息
     readRadarDataFromFiles((arbe_path + file + ".bin"), radar_meas);
 
-    // 发布雷达点云信息
-    // pubPoints2ROS(radar_meas);
-
     // 发布图像信息
     pubImage2ROS((image_path + file + ".png"));
 
     // 发布激光点云信息
-    pubLidar2ROS((lidar_path + file + ".bin"));
-
-    // // 执行算法部分
-    // radarRuner.proc(radar_meas);
-    // auto boxes = radarRuner.getBoxesOutput();
-
-    // pub_boxes(*boxes);
-    
+    pubLidar2ROS((lidar_path + file + ".bin"));    
   }
 }
 
