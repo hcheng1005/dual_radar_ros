@@ -47,13 +47,14 @@ include_directories(
 aux_source_directory(. sources)
 aux_source_directory(src/common_lib sources) 
 aux_source_directory(src/*.cpp sources) 
+aux_source_directory(src/radar_alg/*.cpp sources) 
 
-#radar_tracking_demo
-add_executable(file2bag src/file2bag.cpp src/radar_alg_main.cpp )
+# radar_tracking_demo
+add_executable(file2bag src/file2bag.cpp )
 target_sources(file2bag PUBLIC ${sources})
 target_link_libraries(file2bag ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
-add_executable(radar_node src/radar_arbe_node.cpp )
+add_executable(radar_node src/radar_arbe_node.cpp src/radar_alg/radar_alg_main.cpp src/radar_alg/ego_velocity_estimator.cpp )
 target_sources(radar_node PUBLIC ${sources})
 target_link_libraries(radar_node ${catkin_LIBRARIES})
 

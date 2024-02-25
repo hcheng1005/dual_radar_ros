@@ -1,8 +1,11 @@
-#include "../include/radar_alg_main.h"
-
+#include "radar_alg_main.h"
+#include <sensor_msgs/PointCloud2.h>
 #include <opencv2/opencv.hpp>
 
 cv::Mat image = cv::Mat::zeros(600, 800, CV_8UC3); // 宽800，高600，3通道图像
+
+sensor_msgs::PointCloud2 inlier_radar_msg;
+sensor_msgs::PointCloud2 outlier_radar_msg;
 
 namespace RadarExp
 {
@@ -11,9 +14,50 @@ namespace RadarExp
         // 点云聚类
         radarPointsPtr = std::make_shared<std::vector<radarPoint>>(radarPoints);
 
-        getRadarClusters();
+        // 点云过滤
+        pointsFilter(radarPointsPtr);
+
+        EgoVelocityEstimator(radarPoints);
+
+        // 点云聚类以及box拟合
+        // getRadarClusters();
+
+        // 跟踪算法
     }
 
+    void radarAlg::pointsFilter(std::shared_ptr<std::vector<radarPoint>> &pointPtr)
+    {
+        // 遍历所有点云，删除指定范围的点云
+        std::vector<radarPoint> newPoints;
+        for (int i = 0; i < pointPtr->size(); i++)
+        {
+            auto &pc = pointPtr->at(i);
+
+            if ((pc.z < -2.0) || (pc.z > 3.0))
+            {
+                continue;
+            }
+
+            newPoints.push_back(pc);
+        }
+
+        std::cout << "Before Filter: " << pointPtr->size() << " \n"
+                  << "After Filter: " << newPoints.size() << std::endl;
+
+        pointPtr = std::make_shared<std::vector<radarPoint>>(newPoints);
+    }
+
+    void radarAlg::EgoVelocityEstimator(std::vector<radarPoint> &radarPoints)
+    {
+        rio::Vector3 v_r, sigma_v_r;
+        RadarEgoVelocityEstimatorPtr->estimate(radarPoints, v_r, sigma_v_r, inlier_radar_msg, outlier_radar_msg);
+    }
+
+    /**
+     * @name: getRadarClusters
+     * @description: 毫米波雷达聚类算法
+     * @return {*}
+     */
     void radarAlg::getRadarClusters()
     {
         DBSCAN::Point4DBSCAN Point;
@@ -31,8 +75,8 @@ namespace RadarExp
             DBSCAN::Point4DBSCAN Point;
 
             Point.PointInfo.ID = i;
-            Point.PointInfo.DistLat = radar_p.x;
-            Point.PointInfo.DistLong = radar_p.y;
+            Point.PointInfo.DistLat = radar_p.y;
+            Point.PointInfo.DistLong = radar_p.x;
             Point.PointInfo.DisHeight = radar_p.z;
 
             Point.PointInfo.V = radar_p.doppler;
@@ -92,7 +136,7 @@ namespace RadarExp
                 measZ.push_back(radarPointsPtr->at(PointSet.at(subCluster.at(idx)).PointInfo.ID).z);
             }
 
-            // do l-shape fitting
+            // 基于L_Shape Fitting拟合box
             RotRect2D_t RotRect = L_shape_Fit_Proc(pointMat, maxAngle, minAngle, step);
 
             // z轴属性计算：中心位置和高度
@@ -107,23 +151,22 @@ namespace RadarExp
 
             boxId++;
 
-            // std::cout << RotRect.corner[4][0] << ", " 
-            //         << RotRect.corner[4][1] << ", " 
-            //         << RotRect.length << ", " 
-            //         << RotRect.width << ", " 
+            // std::cout << RotRect.corner[4][0] << ", "
+            //         << RotRect.corner[4][1] << ", "
+            //         << RotRect.length << ", "
+            //         << RotRect.width << ", "
             //         << RotRect.theta / M_PI * 180.0
             //         << std::endl;
 
-            if(VISUALIZATION)
+            if (VISUALIZATION)
             {
                 cv::Rect rect((RotRect.corner[4][0] - RotRect.width * 0.5 + 100) / 200 * 800,
-                            600 - (RotRect.corner[4][1] + RotRect.length * 0.5) / 100 * 600,
-                            RotRect.width / 200 * 800,
-                            RotRect.length / 100 * 600); // 定义矩形框，左上角坐标 (200, 200)，宽高 (200, 200)
+                              600 - (RotRect.corner[4][1] + RotRect.length * 0.5) / 100 * 600,
+                              RotRect.width / 200 * 800,
+                              RotRect.length / 100 * 600); // 定义矩形框，左上角坐标 (200, 200)，宽高 (200, 200)
 
                 cv::rectangle(image, rect, cv::Scalar(125, 125, 125), 2); // 绿色矩形框
             }
-
         }
     }
 }
