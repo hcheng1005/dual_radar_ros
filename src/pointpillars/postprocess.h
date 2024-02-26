@@ -125,4 +125,12 @@ class PostprocessCuda {
     
     
     std::vector<float>& out_detection, std::vector<int>& out_label , std::vector<float>& out_score);
+
+    void DoPostprocessCuda4Arbe(
+    float* cls_pred,
+    const float* box_preds,
+    float* host_box, 
+    float* host_score, 
+    int* host_filtered_count,
+    std::vector<float>& out_detection, std::vector<int>& out_label , std::vector<float>& out_score);
 };

@@ -48,7 +48,9 @@
 
 void PointPillars::InitParams()
 {
+    std::cout << pp_config_ << std::endl;
     YAML::Node params = YAML::LoadFile(pp_config_);
+    std::cout << pp_config_ << std::endl;
     kPillarXSize = params["DATA_CONFIG"]["DATA_PROCESSOR"][2]["VOXEL_SIZE"][0].as<float>();
     kPillarYSize = params["DATA_CONFIG"]["DATA_PROCESSOR"][2]["VOXEL_SIZE"][1].as<float>();
     kPillarZSize = params["DATA_CONFIG"]["DATA_PROCESSOR"][2]["VOXEL_SIZE"][2].as<float>();
@@ -61,19 +63,28 @@ void PointPillars::InitParams()
     kNumClass = params["CLASS_NAMES"].size();
     kMaxNumPillars = params["DATA_CONFIG"]["DATA_PROCESSOR"][2]["MAX_NUMBER_OF_VOXELS"]["test"].as<int>();
     kMaxNumPointsPerPillar = params["DATA_CONFIG"]["DATA_PROCESSOR"][2]["MAX_POINTS_PER_VOXEL"].as<int>();
-    kNumPointFeature = 5; // [x, y, z, i,0]
+    kNumPointFeature = 4; // [x, y, z, i,0]
     kNumInputBoxFeature = 7;
-    kNumOutputBoxFeature = params["MODEL"]["DENSE_HEAD"]["TARGET_ASSIGNER_CONFIG"]["BOX_CODER_CONFIG"]["code_size"].as<int>();
+
+    if(0)
+    {
+        kNumOutputBoxFeature = params["MODEL"]["DENSE_HEAD"]["TARGET_ASSIGNER_CONFIG"]["BOX_CODER_CONFIG"]["code_size"].as<int>();
+    }
+    else{
+        kNumOutputBoxFeature = 7;
+    }
+
     kBatchSize = 1;
     kNumIndsForScan = 1024;
     kNumThreads = 64;
     kNumBoxCorners = 8;
-    kAnchorStrides = 4;
+    kAnchorStrides = 2;
     kNmsPreMaxsize = params["MODEL"]["POST_PROCESSING"]["NMS_CONFIG"]["NMS_PRE_MAXSIZE"].as<int>();
     kNmsPostMaxsize = params["MODEL"]["POST_PROCESSING"]["NMS_CONFIG"]["NMS_POST_MAXSIZE"].as<int>();
     // params for initialize anchors
     // Adapt to OpenPCDet
     kAnchorNames = params["CLASS_NAMES"].as<std::vector<std::string>>();
+    std::cout << "kAnchorNames: " << kAnchorNames.size() << std::endl;
     for (int i = 0; i < kAnchorNames.size(); ++i)
     {
         kAnchorDxSizes.emplace_back(params["MODEL"]["DENSE_HEAD"]["ANCHOR_GENERATOR_CONFIG"][i]["anchor_sizes"][0][0].as<float>());
@@ -81,13 +92,28 @@ void PointPillars::InitParams()
         kAnchorDzSizes.emplace_back(params["MODEL"]["DENSE_HEAD"]["ANCHOR_GENERATOR_CONFIG"][i]["anchor_sizes"][0][2].as<float>());
         kAnchorBottom.emplace_back(params["MODEL"]["DENSE_HEAD"]["ANCHOR_GENERATOR_CONFIG"][i]["anchor_bottom_heights"][0].as<float>());
     }
-    for (int idx_head = 0; idx_head < params["MODEL"]["DENSE_HEAD"]["RPN_HEAD_CFGS"].size(); ++idx_head)
+
+    // 确认是AnchorHeadSingle or AnchorHeadMulti
+    if(params["MODEL"]["DENSE_HEAD"]["NAME"].as<std::string>() == "AnchorHeadMulti")
     {
-        int num_cls_per_head = params["MODEL"]["DENSE_HEAD"]["RPN_HEAD_CFGS"][idx_head]["HEAD_CLS_NAME"].size();
-        std::vector<int> value;
-        for (int i = 0; i < num_cls_per_head; ++i)
+        for (int idx_head = 0; idx_head < params["MODEL"]["DENSE_HEAD"]["RPN_HEAD_CFGS"].size(); ++idx_head)
         {
-            value.emplace_back(idx_head + i);
+            int num_cls_per_head = params["MODEL"]["DENSE_HEAD"]["RPN_HEAD_CFGS"][idx_head]["HEAD_CLS_NAME"].size();
+            std::vector<int> value;
+            for (int i = 0; i < num_cls_per_head; ++i)
+            {
+                value.emplace_back(idx_head + i);
+            }
+            kMultiheadLabelMapping.emplace_back(value);
+        }
+    }
+    else
+    {
+        // int num_cls_per_head = params["MODEL"]["DENSE_HEAD"]["RPN_HEAD_CFGS"][idx_head]["HEAD_CLS_NAME"].size();
+        std::vector<int> value;
+        for (int i = 0; i < kAnchorNames.size(); ++i)
+        {
+            value.emplace_back(i);
         }
         kMultiheadLabelMapping.emplace_back(value);
     }
@@ -103,9 +129,9 @@ void PointPillars::InitParams()
     kNumAnchor = kNumAnchorXinds * kNumAnchorYinds * 2 * kNumClass;  // H * W * Ro * N = 196608
 
     kNumAnchorPerCls = kNumAnchorXinds * kNumAnchorYinds * 2; // H * W * Ro = 32768
-    kRpnBoxOutputSize = kNumAnchor * kNumOutputBoxFeature;
-    kRpnClsOutputSize = kNumAnchor * kNumClass;
-    kRpnDirOutputSize = kNumAnchor * 2;
+    // kRpnBoxOutputSize = kNumAnchor * kNumOutputBoxFeature;
+    // kRpnClsOutputSize = kNumAnchor * kNumClass;
+    // kRpnDirOutputSize = kNumAnchor * 2;
 }
 
 PointPillars::PointPillars(const float score_threshold,
@@ -121,9 +147,11 @@ PointPillars::PointPillars(const float score_threshold,
       backbone_file_(backbone_file),
       pp_config_(pp_config)
 {
-    InitParams();
-    InitTRT(use_onnx_);
-    DeviceMemoryMalloc();
+    std::cout << ("Start PointPillars Init") << std::endl;
+
+    InitParams();std::cout << ("step 00") << std::endl;
+    InitTRT(use_onnx_);std::cout << ("step 01") << std::endl;
+    DeviceMemoryMalloc();std::cout << ("step 02") << std::endl;
 
     std::cout << ("step 1") << std::endl;
 
@@ -143,18 +171,17 @@ PointPillars::PointPillars(const float score_threshold,
 
     const float float_min = std::numeric_limits<float>::lowest();
     const float float_max = std::numeric_limits<float>::max();
-    postprocess_cuda_ptr_.reset(
-        new PostprocessCuda(kNumThreads,
-                            float_min, float_max,
-                            kNumClass, kNumAnchorPerCls,
-                            kMultiheadLabelMapping,
-                            score_threshold_,
-                            nms_overlap_threshold_,
-                            kNmsPreMaxsize,
-                            kNmsPostMaxsize,
-                            kNumBoxCorners,
-                            kNumInputBoxFeature,
-                            kNumOutputBoxFeature)); /*kNumOutputBoxFeature*/
+    postprocess_cuda_ptr_.reset(new PostprocessCuda(kNumThreads,
+                                                    float_min, float_max,
+                                                    kNumClass, kNumAnchorPerCls,
+                                                    kMultiheadLabelMapping,
+                                                    score_threshold_,
+                                                    nms_overlap_threshold_,
+                                                    kNmsPreMaxsize,
+                                                    kNmsPostMaxsize,
+                                                    kNumBoxCorners,
+                                                    kNumInputBoxFeature,
+                                                    kNumOutputBoxFeature)); /*kNumOutputBoxFeature*/
 
     std::cout << ("PointPillars Init !") << std::endl;
 }
@@ -185,14 +212,16 @@ void PointPillars::DeviceMemoryMalloc()
 
     GPU_CHECK(cudaMalloc(&rpn_buffers_[0], kRpnInputSize * sizeof(float)));
 
-    GPU_CHECK(cudaMalloc(&rpn_buffers_[1], kNumAnchorPerCls * sizeof(float))); // classes
-    GPU_CHECK(cudaMalloc(&rpn_buffers_[2], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
-    GPU_CHECK(cudaMalloc(&rpn_buffers_[3], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
-    GPU_CHECK(cudaMalloc(&rpn_buffers_[4], kNumAnchorPerCls * sizeof(float)));
-    GPU_CHECK(cudaMalloc(&rpn_buffers_[5], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
-    GPU_CHECK(cudaMalloc(&rpn_buffers_[6], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
+    // GPU_CHECK(cudaMalloc(&rpn_buffers_[1], kNumAnchorPerCls * sizeof(float))); // classes
+    // GPU_CHECK(cudaMalloc(&rpn_buffers_[2], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
+    // GPU_CHECK(cudaMalloc(&rpn_buffers_[3], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
+    // GPU_CHECK(cudaMalloc(&rpn_buffers_[4], kNumAnchorPerCls * sizeof(float)));
+    // GPU_CHECK(cudaMalloc(&rpn_buffers_[5], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
+    // GPU_CHECK(cudaMalloc(&rpn_buffers_[6], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
+    // GPU_CHECK(cudaMalloc(&rpn_buffers_[7], kNumAnchorPerCls * kNumClass * kNumOutputBoxFeature * sizeof(float))); // boxes
 
-    GPU_CHECK(cudaMalloc(&rpn_buffers_[7], kNumAnchorPerCls * kNumClass * kNumOutputBoxFeature * sizeof(float))); // boxes
+    GPU_CHECK(cudaMalloc(&rpn_buffers_[1], kNumAnchorPerCls * sizeof(float))); // classes
+    GPU_CHECK(cudaMalloc(&rpn_buffers_[2], kNumAnchorPerCls * kNumClass * kNumOutputBoxFeature * sizeof(float))); // boxes
 
     // for scatter kernel
     GPU_CHECK(cudaMalloc(reinterpret_cast<void **>(&dev_scattered_feature_),
@@ -225,11 +254,11 @@ PointPillars::~PointPillars()
     GPU_CHECK(cudaFree(rpn_buffers_[0]));
     GPU_CHECK(cudaFree(rpn_buffers_[1]));
     GPU_CHECK(cudaFree(rpn_buffers_[2]));
-    GPU_CHECK(cudaFree(rpn_buffers_[3]));
-    GPU_CHECK(cudaFree(rpn_buffers_[4]));
-    GPU_CHECK(cudaFree(rpn_buffers_[5]));
-    GPU_CHECK(cudaFree(rpn_buffers_[6]));
-    GPU_CHECK(cudaFree(rpn_buffers_[7]));
+    // GPU_CHECK(cudaFree(rpn_buffers_[3]));
+    // GPU_CHECK(cudaFree(rpn_buffers_[4]));
+    // GPU_CHECK(cudaFree(rpn_buffers_[5]));
+    // GPU_CHECK(cudaFree(rpn_buffers_[6]));
+    // GPU_CHECK(cudaFree(rpn_buffers_[7]));
     pfe_context_->destroy();
     backbone_context_->destroy();
     pfe_engine_->destroy();
@@ -243,7 +272,6 @@ PointPillars::~PointPillars()
 
 void PointPillars::SetDeviceMemoryToZero()
 {
-
     GPU_CHECK(cudaMemset(dev_num_points_per_pillar_, 0, kMaxNumPillars * sizeof(float)));
     GPU_CHECK(cudaMemset(dev_x_coors_, 0, kMaxNumPillars * sizeof(int)));
     GPU_CHECK(cudaMemset(dev_y_coors_, 0, kMaxNumPillars * sizeof(int)));
@@ -405,6 +433,9 @@ void PointPillars::DoInference(const float *in_points_array,
     GPU_CHECK(cudaMemcpyAsync(pfe_buffers_[0], dev_pfe_gather_feature_,
                               kMaxNumPillars * kMaxNumPointsPerPillar * kNumGatherPointFeature * sizeof(float), /// kNumGatherPointFeature
                               cudaMemcpyDeviceToDevice, stream));
+
+    std::cout << "Before pfe_context_ " << std::endl;
+
     pfe_context_->enqueueV2(pfe_buffers_, stream, nullptr);
     cudaDeviceSynchronize();
     auto pfe_end = std::chrono::high_resolution_clock::now();
@@ -412,9 +443,8 @@ void PointPillars::DoInference(const float *in_points_array,
 
     // [STEP 4] : scatter pillar feature
     auto scatter_start = std::chrono::high_resolution_clock::now();
-    scatter_cuda_ptr_->DoScatterCuda(
-        host_pillar_count_[0], dev_x_coors_, dev_y_coors_,
-        reinterpret_cast<float *>(pfe_buffers_[1]), dev_scattered_feature_);
+    scatter_cuda_ptr_->DoScatterCuda(host_pillar_count_[0], dev_x_coors_, dev_y_coors_,
+                                    reinterpret_cast<float *>(pfe_buffers_[1]), dev_scattered_feature_);
     cudaDeviceSynchronize();
     auto scatter_end = std::chrono::high_resolution_clock::now();
     // DEVICE_SAVE<float>(dev_scattered_feature_ ,  kRpnInputSize,"2_Model_backbone_input_dev_scattered_feature");
@@ -424,24 +454,38 @@ void PointPillars::DoInference(const float *in_points_array,
     GPU_CHECK(cudaMemcpyAsync(rpn_buffers_[0], dev_scattered_feature_,
                               kBatchSize * kRpnInputSize * sizeof(float),
                               cudaMemcpyDeviceToDevice, stream));
+
+    std::cout << "Before backbone_context_ " << std::endl;
+
     backbone_context_->enqueueV2(rpn_buffers_, stream, nullptr);
     cudaDeviceSynchronize();
     auto backbone_end = std::chrono::high_resolution_clock::now();
 
+    std::cout << "Before postprocess_start " << std::endl;
+
     // [STEP 6]: postprocess (multihead)
     auto postprocess_start = std::chrono::high_resolution_clock::now();
-    postprocess_cuda_ptr_->DoPostprocessCuda(
+    // postprocess_cuda_ptr_->DoPostprocessCuda(
+    //     reinterpret_cast<float *>(rpn_buffers_[1]), // [cls]   kNumAnchorPerCls
+    //     reinterpret_cast<float *>(rpn_buffers_[2]), // [cls]   kNumAnchorPerCls * 2 * 2
+    //     reinterpret_cast<float *>(rpn_buffers_[3]), // [cls]   kNumAnchorPerCls * 2 * 2
+    //     reinterpret_cast<float *>(rpn_buffers_[4]), // [cls]   kNumAnchorPerCls
+    //     reinterpret_cast<float *>(rpn_buffers_[5]), // [cls]   kNumAnchorPerCls * 2 * 2
+    //     reinterpret_cast<float *>(rpn_buffers_[6]), // [cls]   kNumAnchorPerCls * 2 * 2
+    //     reinterpret_cast<float *>(rpn_buffers_[7]), // [boxes] kNumAnchorPerCls * kNumClass * kNumOutputBoxFeature
+    //     host_box_,
+    //     host_score_,
+    //     host_filtered_count_,
+    //     *out_detections, *out_labels, *out_scores);
+
+    postprocess_cuda_ptr_->DoPostprocessCuda4Arbe(
         reinterpret_cast<float *>(rpn_buffers_[1]), // [cls]   kNumAnchorPerCls
-        reinterpret_cast<float *>(rpn_buffers_[2]), // [cls]   kNumAnchorPerCls * 2 * 2
-        reinterpret_cast<float *>(rpn_buffers_[3]), // [cls]   kNumAnchorPerCls * 2 * 2
-        reinterpret_cast<float *>(rpn_buffers_[4]), // [cls]   kNumAnchorPerCls
-        reinterpret_cast<float *>(rpn_buffers_[5]), // [cls]   kNumAnchorPerCls * 2 * 2
-        reinterpret_cast<float *>(rpn_buffers_[6]), // [cls]   kNumAnchorPerCls * 2 * 2
-        reinterpret_cast<float *>(rpn_buffers_[7]), // [boxes] kNumAnchorPerCls * kNumClass * kNumOutputBoxFeature
+        reinterpret_cast<float *>(rpn_buffers_[2]), // [boxes] kNumAnchorPerCls * kNumClass * kNumOutputBoxFeature
         host_box_,
         host_score_,
         host_filtered_count_,
         *out_detections, *out_labels, *out_scores);
+
     cudaDeviceSynchronize();
     auto postprocess_end = std::chrono::high_resolution_clock::now();
 

@@ -25,30 +25,27 @@ generate_messages(
    std_msgs
  )
 
-
 catkin_package()
 
 set(PCL_INCLUDE_DIRS "usr/include/pcl-1.10/pcl")
 find_package(PCL REQUIRED)
 find_package(OpenCV REQUIRED)
-set(OpenCV_INCLUDE_DIRS "usr/local/include/opencv4/opencv2")
+# set(OpenCV_INCLUDE_DIRS "usr/local/include/opencv4/opencv2")
 set(Eigen_INCLUDE_DIRS "usr/local/include/eigen3")
 
 find_package(yaml-cpp REQUIRED)
 
 find_package(CUDA REQUIRED QUIET)
 include_directories(${CUDA_INCLUDE_DIRS})
-if (CUDA_VERSION VERSION_LESS "11.0")
-  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -std=c++11 -Wno-deprecated-gpu-targets)
-else ()
-  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -std=c++17 -Wno-deprecated-gpu-targets)
-endif ()
+# set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -std=c++17 -Wno-deprecated-gpu-targets)
+
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 include_directories(
         ${PCL_INCLUDE_DIRS}
         ${Eigen_INCLUDE_DIRS}
         ${catkin_INCLUDE_DIRS}
-        ${OpenCV_INCLUDE_DIRS}
+        # ${OpenCV_INCLUDE_DIRS}
         include
 )
 
@@ -58,49 +55,53 @@ aux_source_directory(src/common_lib sources)
 aux_source_directory(src/*.cpp sources) 
 aux_source_directory(src/radar_alg/*.cpp sources) 
 
-# radar_tracking_demo
+# 
 add_executable(file2bag src/file2bag.cpp )
 target_sources(file2bag PUBLIC ${sources})
 target_link_libraries(file2bag ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
-add_executable(radar_node src/radar_arbe_node.cpp src/radar_alg/radar_alg_main.cpp src/radar_alg/ego_velocity_estimator.cpp )
-target_sources(radar_node PUBLIC ${sources})
-target_link_libraries(radar_node ${catkin_LIBRARIES})
 
 
-
-# LIDAR
+#***********************************************************************************************
+# radar 
 # 添加*.cu文件
 cuda_add_library(gpu_point_pillars_lib
                 src/pointpillars/postprocess.cu
                 src/pointpillars/scatter.cu
                 src/pointpillars/preprocess.cu
                 src/pointpillars/nms.cu
-                OPTIONS -DYAML_BUILD_SHARED_LIBS=ON 
 )
 
 # 编译gpu相关文件库
 target_link_libraries(gpu_point_pillars_lib
                     ${CUDA_LIBRARIES} 
+                    ${CUDA_CUBLAS_LIBRARIES}
+                    ${CUDA_curand_LIBRARY}
+                    ${CUDNN_LIBRARY}
                     nvonnxparser
                     nvinfer
 )
 
-# include_directories("/data/chenghao/TensorRT-8.2.0.6/include/")
-# link_directories("/data/chenghao/TensorRT-8.2.0.6/lib/")
+add_executable(radar_node src/radar_arbe_node.cpp 
+                          src/radar_alg/radar_alg_main.cpp 
+                          src/radar_alg/ego_velocity_estimator.cpp 
+                          src/pointpillars/pointpillars.cc)
 
+target_sources(radar_node PUBLIC ${sources})
+target_link_libraries(radar_node ${catkin_LIBRARIES} yaml-cpp gpu_point_pillars_lib)
+
+#***********************************************************************************************
+
+# lidar
 add_executable(lidar_node src/lidar_node.cpp src/pointpillars/pointpillars.cc )
 target_sources(lidar_node PUBLIC ${sources})
-target_link_libraries(lidar_node ${catkin_LIBRARIES} ${CUDA_LIBRARIES}     ${CUDA_LIBRARIES}
-                                  ${CUDA_CUBLAS_LIBRARIES}
-                                  ${CUDA_curand_LIBRARY}
-                                  ${CUDNN_LIBRARY}
+target_link_libraries(lidar_node ${catkin_LIBRARIES}
                                   yaml-cpp
                                   gpu_point_pillars_lib)
 
+#***********************************************************************************************
 
-
-
+# camera
 add_executable(camera_node src/camera_node.cpp )
 target_sources(camera_node PUBLIC ${sources})
 target_link_libraries(camera_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} )
