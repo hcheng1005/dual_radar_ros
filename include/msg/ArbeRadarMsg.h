@@ -16,7 +16,7 @@
 #include <ros/message_operations.h>
 
 #include <std_msgs/Header.h>
-#include <radarExp/ArbeRadarPoint.h>
+#include "ArbeRadarPoint.h"
 
 namespace radarExp
 {

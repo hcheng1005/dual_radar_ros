@@ -34,6 +34,15 @@ find_package(OpenCV REQUIRED)
 set(OpenCV_INCLUDE_DIRS "usr/local/include/opencv4/opencv2")
 set(Eigen_INCLUDE_DIRS "usr/local/include/eigen3")
 
+find_package(yaml-cpp REQUIRED)
+
+find_package(CUDA REQUIRED QUIET)
+include_directories(${CUDA_INCLUDE_DIRS})
+if (CUDA_VERSION VERSION_LESS "11.0")
+  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -std=c++11 -Wno-deprecated-gpu-targets)
+else ()
+  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -std=c++17 -Wno-deprecated-gpu-targets)
+endif ()
 
 include_directories(
         ${PCL_INCLUDE_DIRS}
@@ -58,13 +67,43 @@ add_executable(radar_node src/radar_arbe_node.cpp src/radar_alg/radar_alg_main.c
 target_sources(radar_node PUBLIC ${sources})
 target_link_libraries(radar_node ${catkin_LIBRARIES})
 
-add_executable(lidar_node src/lidar_node.cpp )
+
+
+# LIDAR
+# 添加*.cu文件
+cuda_add_library(gpu_point_pillars_lib
+                src/pointpillars/postprocess.cu
+                src/pointpillars/scatter.cu
+                src/pointpillars/preprocess.cu
+                src/pointpillars/nms.cu
+                OPTIONS -DYAML_BUILD_SHARED_LIBS=ON 
+)
+
+# 编译gpu相关文件库
+target_link_libraries(gpu_point_pillars_lib
+                    ${CUDA_LIBRARIES} 
+                    nvonnxparser
+                    nvinfer
+)
+
+# include_directories("/data/chenghao/TensorRT-8.2.0.6/include/")
+# link_directories("/data/chenghao/TensorRT-8.2.0.6/lib/")
+
+add_executable(lidar_node src/lidar_node.cpp src/pointpillars/pointpillars.cc )
 target_sources(lidar_node PUBLIC ${sources})
-target_link_libraries(lidar_node ${catkin_LIBRARIES} )
+target_link_libraries(lidar_node ${catkin_LIBRARIES} ${CUDA_LIBRARIES}     ${CUDA_LIBRARIES}
+                                  ${CUDA_CUBLAS_LIBRARIES}
+                                  ${CUDA_curand_LIBRARY}
+                                  ${CUDNN_LIBRARY}
+                                  yaml-cpp
+                                  gpu_point_pillars_lib)
+
+
+
 
 add_executable(camera_node src/camera_node.cpp )
 target_sources(camera_node PUBLIC ${sources})
-target_link_libraries(camera_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+target_link_libraries(camera_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} )
 
 
 
