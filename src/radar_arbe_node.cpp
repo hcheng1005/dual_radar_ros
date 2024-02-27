@@ -90,28 +90,21 @@ void callbackCloud(const radarExp::ArbeRadarMsg &arbe_msg)
     // radarRuner->proc(radarPoints);
     // auto boxes = radarRuner->getBoxesOutput();
 
-    // // 发布聚类结果
-    // pub_boxes(*boxes);
+    // std::vector<Bndbox> boxes;
+    // for(int i=0; i<out_labels.size(); i++)
+    // {
+    //     Bndbox new_Bndbox(out_detections.at(i*7),out_detections.at(i*7+1),out_detections.at(i*7+2),
+    //                         out_detections.at(i*7+3),out_detections.at(i*7+4),out_detections.at(i*7+5),
+    //                         0.0, 0.0,
+    //                         out_detections.at(i*7+6),
+    //                         i, out_scores.at(i), out_labels.at(i));
 
-    float *points_array = new float[arbe_msg.point_num * 4];
-    int in_num_points = arbe_msg.point_num;
+    //     boxes.push_back(new_Bndbox);
+    // }
 
-    for(int i=0; i<arbe_msg.point_num; i++)
-    {
-        points_array[4*i + 0] = arbe_msg.points.at(i).x;
-        points_array[4*i + 1] = arbe_msg.points.at(i).y;
-        points_array[4*i + 2] = arbe_msg.points.at(i).z;
-        points_array[4*i + 3] = arbe_msg.points.at(i).rcs;
-        // points_array[5*i + 4] = arbe_msg.points.at(i).doppler;
-    }
+    // pub_boxes(boxes);
 
-    std::vector<float> out_detections;
-    std::vector<int> out_labels;
-    std::vector<float> out_scores;
-
-    PointPillars_->DoInference(points_array, in_num_points, &out_detections, &out_labels, &out_scores);
-
-    delete points_array;
+    // delete points_array;
 }
 
 
@@ -132,12 +125,12 @@ int main(int argc, char**argv) {
     // 注册算法模块
     // radarRuner = new RadarExp::radarAlg();
 
-    PointPillars_ = new PointPillars(0.1,
-                                    0.3,
-                                    false,
-                                    "/data/chenghao/private/pp_ros_ws/src/dual_radar_ros/src/pointpillars/model/arbe_pp_pfe.trt",
-                                    "/data/chenghao/private/pp_ros_ws/src/dual_radar_ros/src/pointpillars/model/arbe_pp_backbone.trt",
-                                    "/data/chenghao/private/pp_ros_ws/src/dual_radar_ros/src/pointpillars/cfgs/pointpillar_arbe.yaml");
+    // PointPillars_ = new PointPillars(0.7,
+    //                                 0.1,
+    //                                 false,
+    //                                 "/data/chenghao/private/pp_ros_ws/src/dual_radar_ros/src/pointpillars/model/arbe_pp_pfe.trt",
+    //                                 "/data/chenghao/private/pp_ros_ws/src/dual_radar_ros/src/pointpillars/model/arbe_pp_backbone.trt",
+    //                                 "/data/chenghao/private/pp_ros_ws/src/dual_radar_ros/src/pointpillars/cfgs/pointpillar_arbe.yaml");
     
     ros::spin();
 

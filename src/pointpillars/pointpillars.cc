@@ -212,16 +212,13 @@ void PointPillars::DeviceMemoryMalloc()
 
     GPU_CHECK(cudaMalloc(&rpn_buffers_[0], kRpnInputSize * sizeof(float)));
 
-    // GPU_CHECK(cudaMalloc(&rpn_buffers_[1], kNumAnchorPerCls * sizeof(float))); // classes
-    // GPU_CHECK(cudaMalloc(&rpn_buffers_[2], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
-    // GPU_CHECK(cudaMalloc(&rpn_buffers_[3], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
-    // GPU_CHECK(cudaMalloc(&rpn_buffers_[4], kNumAnchorPerCls * sizeof(float)));
-    // GPU_CHECK(cudaMalloc(&rpn_buffers_[5], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
-    // GPU_CHECK(cudaMalloc(&rpn_buffers_[6], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
-    // GPU_CHECK(cudaMalloc(&rpn_buffers_[7], kNumAnchorPerCls * kNumClass * kNumOutputBoxFeature * sizeof(float))); // boxes
-
     GPU_CHECK(cudaMalloc(&rpn_buffers_[1], kNumAnchorPerCls * sizeof(float))); // classes
-    GPU_CHECK(cudaMalloc(&rpn_buffers_[2], kNumAnchorPerCls * kNumClass * kNumOutputBoxFeature * sizeof(float))); // boxes
+    GPU_CHECK(cudaMalloc(&rpn_buffers_[2], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
+    GPU_CHECK(cudaMalloc(&rpn_buffers_[3], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
+    GPU_CHECK(cudaMalloc(&rpn_buffers_[4], kNumAnchorPerCls * sizeof(float)));
+    GPU_CHECK(cudaMalloc(&rpn_buffers_[5], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
+    GPU_CHECK(cudaMalloc(&rpn_buffers_[6], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
+    GPU_CHECK(cudaMalloc(&rpn_buffers_[7], kNumAnchorPerCls * kNumClass * kNumOutputBoxFeature * sizeof(float))); // boxes
 
     // for scatter kernel
     GPU_CHECK(cudaMalloc(reinterpret_cast<void **>(&dev_scattered_feature_),
