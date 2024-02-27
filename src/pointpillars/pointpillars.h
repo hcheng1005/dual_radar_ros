@@ -178,8 +178,7 @@ class PointPillars {
     float* dev_pfe_gather_feature_;
     void* pfe_buffers_[2];
     //variable for doPostprocessCudaMultiHead
-    // void* rpn_buffers_[8];
-    void* rpn_buffers_[3];
+    void* rpn_buffers_[8];
     
     std::vector<float*> rpn_box_output_; 
     std::vector<float*> rpn_cls_output_;
