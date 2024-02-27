@@ -13,13 +13,11 @@
 
 // custom
 #include "./radar_alg/radar_alg_main.h"
-#include "./pointpillars/pointpillars.h"
 
 
 ros::Publisher marker_array_pub_;
-
 RadarExp::radarAlg *radarRuner = nullptr;
-PointPillars *PointPillars_ = nullptr;
+
 
 
 void pub_boxes(const std::vector<Bndbox> &boxes)

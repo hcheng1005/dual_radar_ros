@@ -2,3 +2,6 @@ data/*.bag
 *.txt
 *.onnx
 *.trt
+src/pointpillars_singleHead/build/*
+src/pointpillars_singleHead/data/*
+src/pointpillars_singleHead/model/*
