@@ -191,7 +191,6 @@ void PointPillars::DeviceMemoryMalloc()
     GPU_CHECK(cudaMalloc(&rpn_buffers_[4], kNumAnchorPerCls * sizeof(float)));
     GPU_CHECK(cudaMalloc(&rpn_buffers_[5], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
     GPU_CHECK(cudaMalloc(&rpn_buffers_[6], kNumAnchorPerCls * 2 * 2 * sizeof(float)));
-
     GPU_CHECK(cudaMalloc(&rpn_buffers_[7], kNumAnchorPerCls * kNumClass * kNumOutputBoxFeature * sizeof(float))); // boxes
 
     // for scatter kernel

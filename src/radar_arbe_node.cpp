@@ -72,26 +72,39 @@ void callbackCloud(const radarExp::ArbeRadarMsg &arbe_msg)
 {
     ROS_INFO_STREAM("\033[1;32m" << "Rec Arbe_msg: " << "\033[0m");
 
-    // 执行算法部分
-    std::vector<radarPoint> radarPoints;
+    // // 执行算法部分
+    // std::vector<radarPoint> radarPoints;
 
-    // 转格式
-    for(int i=0; i<arbe_msg.point_num; i++)
-    {
-        radarPoint new_pc;
-        new_pc.x = arbe_msg.points.at(i).x;
-        new_pc.y = arbe_msg.points.at(i).y;
-        new_pc.z = arbe_msg.points.at(i).z;
-        new_pc.rcs = arbe_msg.points.at(i).rcs;
-        new_pc.doppler = arbe_msg.points.at(i).doppler;
-        radarPoints.push_back(new_pc);
-    }
+    // // 转格式
+    // for(int i=0; i<arbe_msg.point_num; i++)
+    // {
+    //     radarPoint new_pc;
+    //     new_pc.x = arbe_msg.points.at(i).x;
+    //     new_pc.y = arbe_msg.points.at(i).y;
+    //     new_pc.z = arbe_msg.points.at(i).z;
+    //     new_pc.rcs = arbe_msg.points.at(i).rcs;
+    //     new_pc.doppler = arbe_msg.points.at(i).doppler;
+    //     radarPoints.push_back(new_pc);
+    // }
 
-    radarRuner->proc(radarPoints);
-    auto boxes = radarRuner->getBoxesOutput();
+    // radarRuner->proc(radarPoints);
+    // auto boxes = radarRuner->getBoxesOutput();
 
-    // 发布聚类结果
-    pub_boxes(*boxes);
+    // std::vector<Bndbox> boxes;
+    // for(int i=0; i<out_labels.size(); i++)
+    // {
+    //     Bndbox new_Bndbox(out_detections.at(i*7),out_detections.at(i*7+1),out_detections.at(i*7+2),
+    //                         out_detections.at(i*7+3),out_detections.at(i*7+4),out_detections.at(i*7+5),
+    //                         0.0, 0.0,
+    //                         out_detections.at(i*7+6),
+    //                         i, out_scores.at(i), out_labels.at(i));
+
+    //     boxes.push_back(new_Bndbox);
+    // }
+
+    // pub_boxes(boxes);
+
+    // delete points_array;
 }
 
 
@@ -110,7 +123,14 @@ int main(int argc, char**argv) {
     marker_array_pub_ = nn.advertise<visualization_msgs::MarkerArray>("bboxes", 100);
 
     // 注册算法模块
-    radarRuner = new RadarExp::radarAlg();
+    // radarRuner = new RadarExp::radarAlg();
+
+    // PointPillars_ = new PointPillars(0.7,
+    //                                 0.1,
+    //                                 false,
+    //                                 "/data/chenghao/private/pp_ros_ws/src/dual_radar_ros/src/pointpillars/model/arbe_pp_pfe.trt",
+    //                                 "/data/chenghao/private/pp_ros_ws/src/dual_radar_ros/src/pointpillars/model/arbe_pp_backbone.trt",
+    //                                 "/data/chenghao/private/pp_ros_ws/src/dual_radar_ros/src/pointpillars/cfgs/pointpillar_arbe.yaml");
     
     ros::spin();
 
