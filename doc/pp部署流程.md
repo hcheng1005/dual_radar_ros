@@ -75,12 +75,21 @@ target_link_libraries(lidar_node ${catkin_LIBRARIES}
 
 ### ROS部署
 
-TBD
+DONE。
 
 ## 基于Dual_Radar数据集的修改
-TBD
 
+由于ARBE数据集定义的XY方向和KITTI相反，因此在解算BoundingBox时，做如下修改：
 
+```python
+//   KITTI解码方式
+//   int col = loc_index % feature_x_size;
+//   int row = loc_index / feature_x_size;
+
+// 按照传感器的纵向距离来划分，由于arbe的xy和kitti的xy反向，所有修改为feature_y_size，其余不变
+int col = loc_index % feature_y_size;
+int row = loc_index / feature_y_size;
+```
 
 
 ## 一些报错和解决方法：
