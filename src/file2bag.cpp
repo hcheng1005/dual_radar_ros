@@ -83,8 +83,8 @@ void readBin(std::string path, char *buf, int size)
 void readRadarDataFromFiles(const std::string filePath,
                             std::vector<radarPoint> &radar_meas)
 {
-  radarExp::ArbeRadarMsg arbe_msg;
-  radarExp::ArbeRadarPoint arbe_pc;
+  DualRadar::ArbeRadarMsg arbe_msg;
+  DualRadar::ArbeRadarPoint arbe_pc;
 
   radar_meas.clear(); // clear history
 
@@ -96,8 +96,8 @@ void readRadarDataFromFiles(const std::string filePath,
   // std::cout << "data size:[ " << std::to_string(data_size) << "]" << std::endl;
   data_size = (data_size > (MAX_RADAR_NUMS * RADAR_FEATURES_NUMS * sizeof(float))) ? (MAX_RADAR_NUMS * RADAR_FEATURES_NUMS * sizeof(float)) : data_size;
 
-  // std::cout << "data size:[ " << std::to_string(data_size) << "]" << std::endl;
-  // std::cout << "point size:[ " << std::to_string(data_size / RADAR_FEATURES_NUMS / sizeof(float)) << "]" << std::endl;
+  std::cout << "data size:[ " << std::to_string(data_size) << "]" << std::endl;
+  std::cout << "point size:[ " << std::to_string(data_size / RADAR_FEATURES_NUMS / sizeof(float)) << "]" << std::endl;
 
   // 读取文件数据
   readBin(filePath, (char *)buf, data_size);
@@ -107,9 +107,15 @@ void readRadarDataFromFiles(const std::string filePath,
   float *data_prt = (float *)&buf[0];
   int radar_nums = data_size / RADAR_FEATURES_NUMS / sizeof(float);
   float tmpXYZ[3];
+
+  pcl::PointCloud<pcl::PointXYZ> testcloud; // point cloud msg
+  testcloud.width = radar_nums;
+  testcloud.height = 1;
+  testcloud.points.resize(testcloud.width * testcloud.height);
+
+  radarPoint newRadarPc;
   for (int i = 0; i < radar_nums; i++)
   {
-    radarPoint newRadarPc;
     tmpXYZ[0] = (*data_prt);
     data_prt++;
     tmpXYZ[1] = (*data_prt);
@@ -135,85 +141,32 @@ void readRadarDataFromFiles(const std::string filePath,
     arbe_pc.z = tmpXYZ[2];
     arbe_pc.rcs = newRadarPc.rcs;
     arbe_pc.doppler = newRadarPc.doppler;
-
     arbe_msg.points.push_back(arbe_pc);
 
+    testcloud.points[i].x = tmpXYZ[0];
+    testcloud.points[i].y = tmpXYZ[1];
+    testcloud.points[i].z = tmpXYZ[2];
+
+    // std::cout << arbe_pc.rcs << std::endl;
+
   }
 
-  pcl::PointCloud<pcl::PointXYZ> testcloud; // point cloud msg
-  testcloud.width = radar_meas.size();
-  testcloud.height = 1;
-  testcloud.points.resize(testcloud.width * testcloud.height);
-
-  for (int i = 0; i < radar_meas.size(); i++)
-  {
-    testcloud.points[i].x = radar_meas.at(i).x;
-    testcloud.points[i].y = radar_meas.at(i).y;
-    testcloud.points[i].z = radar_meas.at(i).z;
-  }
+  std::cout << arbe_pc.rcs << std::endl;
 
   sensor_msgs::PointCloud2 laserCloudTemp;
   pcl::toROSMsg(testcloud, laserCloudTemp);
-  laserCloudTemp.header.frame_id = "mmRadar";
+  laserCloudTemp.header.frame_id = "map";
   arbe_pc_pub.publish(laserCloudTemp); // publish
 
-  std::cout << "Get Radar Points:[ " << std::to_string(radar_meas.size()) << " ]" << std::endl;
+  // std::cout << "Get Radar Points:[ " << std::to_string(radar_meas.size()) << " ]" << std::endl;
 
   // fabu
-  arbe_msg.header.frame_id = "mmRadar";
+  arbe_msg.header.frame_id = "map";
   arbe_msg.point_num = radar_nums;
   arbe_msg.points.push_back(arbe_pc);
 
   arbe_msg_pub.publish(arbe_msg);
 }
-
-
-void pub_boxes(const std::vector<Bndbox> &boxes)
-{
-    visualization_msgs::MarkerArray marker_array;
-    tf2::Quaternion myQuaternion;
-
-    uint32_t shape = visualization_msgs::Marker::CUBE;
-    uint32_t id = 0;
-    for (auto box : boxes)
-    {
-        visualization_msgs::Marker marker;
-        marker.header.frame_id = "mmRadar";
-        marker.header.stamp = ros::Time::now();
-
-        marker.id = id;
-        marker.type = shape;
-        marker.action = visualization_msgs::Marker::ADD;
-
-        marker.pose.position.x = box.x;
-        marker.pose.position.y = box.y;
-        marker.pose.position.z = box.z;
-
-        // std::cout << "box.rt: " << box.rt / M_PI * 180.0 << std::endl;
-
-        myQuaternion.setRPY(0, 0, box.rt);
-        marker.pose.orientation = tf2::toMsg(myQuaternion);
-
-        // marker.scale.x = box.l;
-        // marker.scale.y = box.w;
-        marker.scale.x = box.w;
-        marker.scale.y = box.l;
-        marker.scale.z = box.h;
-
-        marker.color.r = 0.0;
-        marker.color.g = 1.0;
-        marker.color.b = 0.0;
-
-        marker.color.a = 0.4;
-
-        marker.lifetime = ros::Duration(1);
-        marker_array.markers.push_back(marker);
-        id++;
-    }
-
-    marker_array_pub_.publish(marker_array);
-}
-
 
 void pubPoints2ROS(std::vector<radarPoint> &radar_meas)
 {
@@ -232,7 +185,7 @@ void pubPoints2ROS(std::vector<radarPoint> &radar_meas)
 
   sensor_msgs::PointCloud2 laserCloudTemp;
   pcl::toROSMsg(testcloud, laserCloudTemp);
-  laserCloudTemp.header.frame_id = "mmRadar";
+  laserCloudTemp.header.frame_id = "map";
   point_radar_pub.publish(laserCloudTemp); // publish
 }
 
@@ -271,7 +224,7 @@ void pubLidar2ROS(std::string lidar_file)
   sensor_msgs::PointCloud2 laserCloudTemp;
   pcl::toROSMsg(*testcloud, laserCloudTemp);
 
-  laserCloudTemp.header.frame_id = "mmRadar";
+  laserCloudTemp.header.frame_id = "map";
 
   point_lidar_pub.publish(laserCloudTemp); // publish
 }
@@ -280,7 +233,7 @@ void pubImage2ROS(std::string img_file)
 {
   cv::Mat image = cv::imread(img_file);
   sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", image).toImageMsg();
-  msg->header.frame_id = "mmRadar";
+  msg->header.frame_id = "map";
   img_pub.publish(msg);
 }
 
@@ -293,11 +246,11 @@ void radarExpDemo(void)
 
   // dual_radar dataset path
 
-  const std::string base_path_ = "/home/charles/dataset/source/all/";
+  const std::string base_path_ = "/data/chenghao/private/data/all_data/";
 
   std::string arbe_path = base_path_ + "/arbe/";
   std::string image_path = base_path_ + "/image/";
-  std::string lidar_path = base_path_ + "/robosense/";
+  std::string lidar_path = base_path_ + "/velodyne/";
 
   // 遍历文件夹并sort文件
   std::string file_path;
@@ -321,7 +274,10 @@ void radarExpDemo(void)
     pubImage2ROS((image_path + file + ".png"));
 
     // 发布激光点云信息
-    pubLidar2ROS((lidar_path + file + ".bin"));    
+    pubLidar2ROS((lidar_path + file + ".bin"));
+
+    ros::Duration(0.05).sleep();
+
   }
 }
 
@@ -329,10 +285,10 @@ int main(int argc, char **argv)
 {
   std::cout << "---- It's a 4D Radar Demo----" << std::endl;
 
-  ros::init(argc, argv, "mmRadar");
+  ros::init(argc, argv, "map");
   ros::NodeHandle nh;
 
-  arbe_msg_pub = nh.advertise<radarExp::ArbeRadarMsg>("arbe_msg", 1);
+  arbe_msg_pub = nh.advertise<DualRadar::ArbeRadarMsg>("arbe_msg", 1);
   arbe_pc_pub = nh.advertise<sensor_msgs::PointCloud2>("arbe_pc", 1);
   point_lidar_pub = nh.advertise<sensor_msgs::PointCloud2>("lidar", 1);
   // marker_array_pub_ = nh.advertise<visualization_msgs::MarkerArray>("bboxes", 100);

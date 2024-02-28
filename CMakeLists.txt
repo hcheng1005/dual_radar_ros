@@ -65,6 +65,38 @@ target_link_libraries(file2bag ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 #***********************************************************************************************
 # radar 
 # 添加*.cu文件
+file(GLOB_RECURSE CORE_FILES 
+      src/pointpillars_singleHead/src/pointpillar/*.cu 
+      src/pointpillars_singleHead/src/pointpillar/*.cpp
+      src/pointpillars_singleHead/src/pointpillar/common/tensor.cu
+      src/pointpillars_singleHead/src/pointpillar/common/tensorrt.cpp
+)
+
+cuda_add_library(gpu_point_pillars_lib_radar
+                ${CORE_FILES}
+)
+
+# 编译gpu相关文件库
+target_link_libraries(gpu_point_pillars_lib_radar
+                    ${CUDA_LIBRARIES} 
+                    ${CUDA_CUBLAS_LIBRARIES}
+                    ${CUDA_curand_LIBRARY}
+                    ${CUDNN_LIBRARY}
+                    nvonnxparser
+                    nvinfer
+)
+
+add_executable(radar_node src/radar_arbe_node.cpp 
+                          src/radar_alg/radar_alg_main.cpp 
+                          src/radar_alg/ego_velocity_estimator.cpp)
+
+target_sources(radar_node PUBLIC ${sources})
+target_link_libraries(radar_node ${catkin_LIBRARIES} gpu_point_pillars_lib_radar)
+
+#***********************************************************************************************
+
+# lidar
+# 添加*.cu文件
 cuda_add_library(gpu_point_pillars_lib
                 src/pointpillars/postprocess.cu
                 src/pointpillars/scatter.cu
@@ -82,38 +114,6 @@ target_link_libraries(gpu_point_pillars_lib
                     nvinfer
 )
 
-# 添加*.cu文件
-file(GLOB_RECURSE CORE_FILES 
-      src/pointpillars_singleHead/pointpillar/*.cu 
-      src/pointpillars_singleHead/pointpillar/*.cpp
-      src/pointpillars_singleHead/pointpillar/common/tensor.cu
-      src/pointpillars_singleHead/pointpillar/common/tensorrt.cpp
-)
-
-cuda_add_library(gpu_point_pillars_lib2
-                ${CORE_FILES}
-)
-
-# 编译gpu相关文件库
-target_link_libraries(gpu_point_pillars_lib2
-                    ${CUDA_LIBRARIES} 
-                    ${CUDA_CUBLAS_LIBRARIES}
-                    ${CUDA_curand_LIBRARY}
-                    ${CUDNN_LIBRARY}
-                    nvonnxparser
-                    nvinfer
-)
-
-add_executable(radar_node src/radar_arbe_node.cpp 
-                          src/radar_alg/radar_alg_main.cpp 
-                          src/radar_alg/ego_velocity_estimator.cpp)
-
-target_sources(radar_node PUBLIC ${sources})
-target_link_libraries(radar_node ${catkin_LIBRARIES} gpu_point_pillars_lib2)
-
-#***********************************************************************************************
-
-# lidar
 add_executable(lidar_node src/lidar_node.cpp src/pointpillars/pointpillars.cc )
 target_sources(lidar_node PUBLIC ${sources})
 target_link_libraries(lidar_node ${catkin_LIBRARIES}
