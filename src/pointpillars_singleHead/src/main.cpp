@@ -141,12 +141,16 @@ std::shared_ptr<pointpillar::lidar::Core> create_core() {
     vp.max_range = nvtype::Float3(39.68f, 92.4f, 1.0);
     vp.voxel_size = nvtype::Float3(0.32f, 0.32f, 4.0f);
 
+    // vp.min_range = nvtype::Float3(-10.0f, -39.68f, -3.0);
+    // vp.max_range = nvtype::Float3(92.4f, 39.68f, 1.0);
+    // vp.voxel_size = nvtype::Float3(0.32f, 0.32f, 4.0f);
+
     vp.grid_size =
         vp.compute_grid_size(vp.max_range, vp.min_range, vp.voxel_size);
     vp.max_voxels = 40000;
     vp.max_points_per_voxel = 32;
     vp.max_points = 300000;
-    vp.num_feature = 5;
+    vp.num_feature = 4;
 
     pointpillar::lidar::PostProcessParameter pp;
     pp.min_range = vp.min_range;
@@ -233,14 +237,33 @@ int main(int argc, char** argv) {
         buffer.reset((char *)data);
         int points_size = length/sizeof(float)/5;
         std::cout << "Lidar points count: "<< points_size <<std::endl;
+
+        float *pc_data = new float[points_size * 4];
+        float *data_ptr = (float *)buffer.get();
+        for(int i=0; i<points_size; i++)
+        {
+            pc_data[4*i + 0] = data_ptr[5*i + 0];
+            pc_data[4*i + 1] = data_ptr[5*i + 1];
+            pc_data[4*i + 2] = data_ptr[5*i + 2];
+            pc_data[4*i + 3] = data_ptr[5*i + 3];
+
+            // for debug
+            // if(i < 10)
+            // {
+            //     std::cout << pc_data[4*i + 0] << ", "<< pc_data[4*i + 1] << ", "<< pc_data[4*i + 2] << ", "
+            //     << pc_data[4*i + 3] << ", " << std::endl;
+            // }
+        }
     
-        auto bboxes = core->forward((float *)buffer.get(), points_size, stream);
+        auto bboxes = core->forward(pc_data, points_size, stream);
         std::cout<<"Detections after NMS: "<< bboxes.size()<<std::endl;
 
         std::string save_file_name = std::string(out_dir) + file + ".txt";
         SaveBoxPred(bboxes, save_file_name);
 
         std::cout << ">>>>>>>>>>>" << std::endl;
+
+        delete pc_data;
     }
 
     checkRuntime(cudaStreamDestroy(stream));

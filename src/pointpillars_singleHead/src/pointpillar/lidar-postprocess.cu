@@ -72,10 +72,15 @@ __global__ void postprocess_kernal(const float *cls_input,
   {
       return;
   }
-  int col = loc_index % feature_x_size;
-  int row = loc_index / feature_x_size;
+//   int col = loc_index % feature_x_size;
+//   int row = loc_index / feature_x_size;
+
+  // 按照传感器的纵向距离来划分，由于arbe的xy和kitti的xy反向，所有修改为feature_y_size，其余不变
+  int col = loc_index % feature_y_size;
+  int row = loc_index / feature_y_size;
   float x_offset = min_x_range + col * (max_x_range - min_x_range) / (feature_x_size - 1);
   float y_offset = min_y_range + row * (max_y_range - min_y_range) / (feature_y_size - 1);
+
   int cls_offset = loc_index * num_anchors * num_classes + ith_anchor * num_classes;
 
   const float *scores = cls_input + cls_offset;
@@ -467,6 +472,12 @@ public:
 
         thrust::device_ptr<combined_float> thr_bndbox_((combined_float *)bndbox_);
         thrust::stable_sort_by_key(thrust::cuda::par.on(_stream), score_, score_ + bndbox_num_, thr_bndbox_, thrust::greater<float>());
+
+        if(bndbox_num_ == 0)
+        {
+            return;
+        }
+
         checkRuntime(nms_launch(bndbox_num_, bndbox_, param_.nms_thresh, h_mask_, _stream));
 
         checkRuntime(cudaMemcpyAsync(h_bndbox_, bndbox_, bndbox_num_ * 9 * sizeof(float), cudaMemcpyDeviceToHost, _stream));

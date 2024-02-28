@@ -22,6 +22,7 @@
  */
 
 #include "pointpillar.hpp"
+#include <iostream>
 
 #include <numeric>
 
@@ -82,11 +83,13 @@ public:
         checkRuntime(cudaMemcpyAsync(lidar_points_device_, lidar_points_host_, bytes_points, cudaMemcpyHostToDevice, _stream));
 
         this->lidar_voxelization_->forward(lidar_points_device_, num_points, _stream);
-        this->lidar_backbone_->forward(this->lidar_voxelization_->features(), this->lidar_voxelization_->coords(), this->lidar_voxelization_->params(), _stream);
+        this->lidar_backbone_->forward(this->lidar_voxelization_->features(), this->lidar_voxelization_->coords(), this->lidar_voxelization_->params(), _stream);        
         this->lidar_postprocess_->forward(this->lidar_backbone_->cls(), this->lidar_backbone_->box(), this->lidar_backbone_->dir(), _stream);
 
         return this->lidar_postprocess_->bndBoxVec();
     }
+
+    float data_[320*248*42];
 
     std::vector<BoundingBox> forward_timer(const float *lidar_points, int num_points, void *stream) {
         int cappoints = static_cast<int>(capacity_points_);
@@ -113,6 +116,18 @@ public:
         timer_.start(_stream);
         this->lidar_backbone_->forward(this->lidar_voxelization_->features(), this->lidar_voxelization_->coords(), this->lidar_voxelization_->params(), _stream);
         times.emplace_back(timer_.stop("Lidar Backbone & Head"));
+
+        checkRuntime(cudaMemcpyAsync(data_, this->lidar_backbone_->box(), 160*124*42*sizeof(float), cudaMemcpyDeviceToHost, _stream));
+        
+        for(int ii=0; ii<2; ii++)
+        {
+            printf("=============================================\n");
+            for(int i=0; i<(7); i++)
+            {
+                std::cout << data_[ii*42 + i] << ", ";
+            }
+            std::cout << std::endl;
+        }
 
         timer_.start(_stream);
         this->lidar_postprocess_->forward(this->lidar_backbone_->cls(), this->lidar_backbone_->box(), this->lidar_backbone_->dir(), _stream);
