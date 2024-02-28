@@ -119,15 +119,15 @@ public:
 
         checkRuntime(cudaMemcpyAsync(data_, this->lidar_backbone_->box(), 160*124*42*sizeof(float), cudaMemcpyDeviceToHost, _stream));
         
-        for(int ii=0; ii<2; ii++)
-        {
-            printf("=============================================\n");
-            for(int i=0; i<(7); i++)
-            {
-                std::cout << data_[ii*42 + i] << ", ";
-            }
-            std::cout << std::endl;
-        }
+        // for(int ii=0; ii<2; ii++)
+        // {
+        //     printf("=============================================\n");
+        //     for(int i=0; i<(7); i++)
+        //     {
+        //         std::cout << data_[ii*42 + i] << ", ";
+        //     }
+        //     std::cout << std::endl;
+        // }
 
         timer_.start(_stream);
         this->lidar_postprocess_->forward(this->lidar_backbone_->cls(), this->lidar_backbone_->box(), this->lidar_backbone_->dir(), _stream);
